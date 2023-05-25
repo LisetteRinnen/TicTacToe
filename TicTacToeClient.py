@@ -14,17 +14,19 @@ class T3TransportLayerSocket:
         self.server_addr = (hostname, port)
 
         self.sock = socket.socket(
-            socket.AT_INET,
+            socket.AF_INET,
             socket.SOCK_STREAM if protocol == "TCP" else socket.SOCK_DGRAM
             )
+        if protocol == "TCP":
+            self.sock.connect(self.server_addr)
     
-    def t3encode(request_body):
+    def t3encode(self, request_body):
         """ Encode the request body for the TTT protocol
             Input should not contain any newline characters
         """
-        return request_body + "\r\n".encode("ascii")
+        return (request_body + "\r\n").encode("ascii")
     
-    def t3decode(response_body):
+    def t3decode(self, response_body):
         """ Decode the response body for the TTT protocol """
         return response_body.decode("ascii").strip()
 
@@ -71,7 +73,7 @@ class T3ProtocolClient:
         self.session_id = None
         self.game_id = None
 
-    def init_session(self, protocol_version=1):
+    def init_session(self, protocol_version="1"):
         """ Create a TTT session """
 
         self.sock.send(f"HELO {protocol_version} {self.client_id}")
@@ -109,10 +111,16 @@ class T3ProtocolClient:
     def stat_game(self, game_id):
         """ Get the state of the TTT game with the given ID """
         self.sock.send(f"STAT {game_id}")
-        bord, player1, player2, next_player, board_state = self.sock.recv()
+        bord_args = self.sock.recv()
+
+        player2, next_player, board_state = None, None, None
+        if len(bord_args) == 3:
+            bord, game_id, player1 = bord_args
+        else:
+            bord, game_id, player1, player2, next_player, board_state = bord_args
 
         board = T3BoardState(game_id, player1, player2, next_player, board_state)
-        return str(board)
+        return board
     
     def stat_current_game(self):
         """ Get the state of the TTT game currently being played """
@@ -128,14 +136,15 @@ class T3ProtocolClient:
         game_over = False
         winner = None
 
-        while (not game_over) or (not my_turn):
+        while (not game_over) and (not my_turn):
             message, *args = self.sock.recv()
             if message == "YRMV":
                 game_id, moving_player_id = args
                 my_turn = moving_player_id == self.client_id
             elif message == "TERM":
                 game_over = True
-                game_id, winner_id = args
+                self.game_id = None
+                game_id, winner_id, *_ = args
                 if winner_id != "KTHXBYE":
                     winner = winner_id
 
@@ -148,7 +157,7 @@ class T3ProtocolClient:
 
         self.sock.send(f"MOVE {self.game_id} {desired_space}")
 
-        bord, player1, player2, next_player, board_state = self.sock.recv()
+        bord, game_id, player1, player2, next_player, board_state = self.sock.recv()
         final_state = T3BoardState(game_id, player1, player2, next_player, board_state)
         if initial_state == final_state:
             success = False
@@ -161,7 +170,7 @@ class T3ProtocolClient:
         self.sock.close()
 
 class T3BoardState:
-    def __init__(self, game_id, player1, player2, next_player, board_state):
+    def __init__(self, game_id, player1, player2, next_player, board):
         self.game_id = game_id
         self.player1 = player1
         self.player2 = player2
@@ -169,18 +178,26 @@ class T3BoardState:
         self.board = board
     
     def __str__(self):
-        board = self.board.split("|")
-        out = (
-            f"--- Game {self.game_id} ---" +
-            f"Crosses (X): {self.player1}" + (" [TURN]" if self.player1 == self.next_player else "") +
-            f"Naughts (O): {self.player2}" + (" [TURN]" if self.player2 == self.next_player else "") +
-            "\n" +
-            f"{board[0]} {board[1]} {board[2]} " +
-            "\n" +
-            f"{board[3]} {board[4]} {board[5]} " +
-            "\n" +
-            f"{board[6]} {board[7]} {board[8]} "
-            )
+        if self.board != None:
+            board = self.board[1:].split("|")
+            out = (
+                f"--- Game {self.game_id} ---" +
+                "\n" +
+                f"Crosses (X): {self.player1}" + (" [TURN]" if self.player1 == self.next_player else "") +
+                "\n" +
+                f"Naughts (O): {self.player2}" + (" [TURN]" if self.player2 == self.next_player else "") +
+                "\n" +
+                f"{board[0]} {board[1]} {board[2]} " +
+                "\n" +
+                f"{board[3]} {board[4]} {board[5]} " +
+                "\n" +
+                f"{board[6]} {board[7]} {board[8]} "
+                )
+        else:
+            out = (f"--- Game {self.game_id} ---" +
+                   "\n" +
+                   f"Has player: {self.player1}"
+                   )
 
         return out
     
@@ -230,18 +247,23 @@ try:
             client.join_game(game_id)
             print("Game joined:")
 
-        print(client.stat_current_game)
         game_over = False
         while not game_over:
+            print(client.stat_current_game())
             print("Waiting for turn...")
             game_over, winner = client.wait_for_turn()
-            print(client.stat_current_game)
+            if game_over:
+                break
+
+            print(client.stat_current_game())
             if not game_over:
                 move_made_successfully = False
                 while not move_made_successfully:
                     print("Where do you want to go? (1-9, starting from top left)")
                     desired_space = input("(default 1): ") or "1"
                     move_made_successfully = client.make_move(desired_space)
+                    if not move_made_successfully:
+                        print("Illegal move!")
         print(f"{winner} won the game!")
 except KeyboardInterrupt:
     client.end_session()
