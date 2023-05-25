@@ -1,7 +1,6 @@
 """ TicTacToeClient.py - Client for the TicTacToeProtocol (TTTP) for INFO 314
 """
 
-import sys
 import socket
 
 class T3TransportLayerSocket:
@@ -9,7 +8,7 @@ class T3TransportLayerSocket:
     """
     MAX_BUF_SIZE = 2048
 
-    def __init__(self, hostname, port, protocol):
+    def __init__(self, hostname, port, protocol, verbose=False):
         self.protocol = protocol
         self.server_addr = (hostname, port)
 
@@ -32,6 +31,7 @@ class T3TransportLayerSocket:
 
     def send(self, request_body):
         """ Send the request body in plaintext (no newline characters) to the TTT server """
+        if verbose: print(f"[{self.protocol} SEND] {request_body}")
         request_body = self.t3encode(request_body)
 
         if self.protocol == "TCP":
@@ -42,13 +42,15 @@ class T3TransportLayerSocket:
     def recv(self):
         """ Recieve a response body from the TTT server as a List of arguments
             e.g. "MOVE GID1 5" -> ["MOVE", "GID1", "5"]
-        """
+        """       
         if self.protocol == "TCP":
             response_body = self.sock.recv(self.MAX_BUF_SIZE)
         elif self.protocol == "UDP":
             response_body = self.sock.recvfrom(self.MAX_BUF_SIZE, self.server_addr)
         
-        return self.t3decode(response_body).split(" ")
+        response_body = self.t3decode(response_body)
+        if verbose: print(f"[{self.protocol} RECV] {response_body}")
+        return response_body.split(" ")
     
     def close(self):
         """ Close the socket if necessary """
@@ -60,14 +62,14 @@ class T3ProtocolClient:
         and is used to send/receive TTTP messages
     """
 
-    def __init__(self, url, client_id):
+    def __init__(self, url, client_id, verbose=False):
         protocol, address = url.split("://")
         protocol = "TCP" if protocol == "t3tcp" else "UDP"
 
         hostname, port = address.split(":")
         port = int(port)
 
-        self.sock = T3TransportLayerSocket(hostname, port, protocol)
+        self.sock = T3TransportLayerSocket(hostname, port, protocol, verbose=verbose)
         self.client_id = client_id
 
         self.session_id = None
@@ -217,11 +219,14 @@ print("What server do you want to connect to?")
 url = input("(default t3tcp://localhost:31161): ") or "t3tcp://localhost:31161"
 print("What is your e-mail?")
 client_id = input("(default alice@example.com): ") or "alice@example.com"
+print("Do you want verbose outputs? yes/no")
+verbose = input("(default no): ") or "no"
+verbose = verbose == "yes"
 
 print("Thank you. Now connecting you to the Tic Tac Toe server at")
 print("\t" + url)
 
-client = T3ProtocolClient(url, client_id)
+client = T3ProtocolClient(url, client_id, verbose=verbose)
 client.init_session()
 
 try:
