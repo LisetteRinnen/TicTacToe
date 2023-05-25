@@ -1,3 +1,10 @@
+""" TTTC_test_server_tcp.py - A rudimentary TCP server for testing the
+    TicTacToeClient.
+
+    After the connection opens, you have to manually write the TCP
+    payload body and hit "enter" to send it
+"""
+
 import socket
 
 HOST = "localhost"
