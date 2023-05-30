@@ -16,13 +16,8 @@ public class TicTacToeServer {
 
     private static ExecutorService exec = Executors.newCachedThreadPool();
 
-    private static long sessionIdCounter = 0;
-    private static long gameIdCounter = 0;
-
-    private static Map<InetAddress, String> sessionIds = new HashMap<>(); // maps InetAddress to sessionId
-    private static Map<String, String> clientIds = new HashMap<>(); // maps sessionId to clientId
-    private static Map<String, List<String>> clientGames = new HashMap<>(); // maps clientIds to a list of gameIds
-    private static Map<String, String> gameStates = new HashMap<>(); // maps gameIds to game state {"OPEN","FULL","DONE"}
+    private static Map<String, ClientConnection> clientConnections = new HashMap<>(); // maps clientIds to clientConnections
+    private static Games games = new Games();
 
     public static void main(String[] args) {
         try {
@@ -49,8 +44,9 @@ public class TicTacToeServer {
                 String request = new String(packet.getData(), 0, packet.getLength());
                 InetAddress clientAddress = packet.getAddress();
                 int clientPort = packet.getPort();
+                System.out.println("[UDP REQUEST] " + request);
 
-                exec.execute(() -> handleClientRequest(null, clientAddress, clientPort, request));
+                exec.execute(() -> handleClientRequest(new ClientConnection(udpSocket, clientAddress, clientPort), request));
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -64,10 +60,12 @@ public class TicTacToeServer {
                 System.out.println("TCP CLIENT CONNECTED");
                 exec.execute(() -> {
                     try {
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                        String request = reader.readLine();
-                        System.out.println("TCP CLIENT REQUEST: " + request);
-                        handleClientRequest(clientSocket, clientSocket.getInetAddress(), clientSocket.getPort(), request);
+                        ClientConnection clientConnection = new ClientConnection(clientSocket);
+                        while(true) {
+                            String request = clientConnection.readRequest();
+                            System.out.println("[TCP REQUEST] " + request);
+                            handleClientRequest(clientConnection, request);
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -78,133 +76,107 @@ public class TicTacToeServer {
         }
     }
 
-    private static void handleClientRequest(Socket clientSocket, InetAddress clientAddress, int clientPort, String request) {
+    private static void handleClientRequest(ClientConnection clientConnection, String request) {
         String[] requestParts = request.split(" ");
         String requestType = requestParts[0];
         String[] parameters = new String[requestParts.length - 1];
         System.arraycopy(requestParts, 1, parameters, 0, parameters.length);
-
-        String response;
-
-        int compatibleProtocolVersion = protocolVersionSupported(parameters);
-        if (compatibleProtocolVersion == -1) {
-            response = "PROT_VER_ERR"; // adjust to correct error response
-        } else {
-            response = handleRequestType(requestType, parameters, compatibleProtocolVersion, clientAddress);
-        }
-
-        sendResponse(clientSocket, response, clientAddress, clientPort);
+        handleRequestType(requestType, parameters, clientConnection);
     }
 
-    private static void sendResponse(Socket clientSocket, String response, InetAddress clientAddress, int clientPort) {
-        // Sending the response back to the client
+    private static void sendResponse(ClientConnection clientConnection, String response) {
         try {
-            byte[] responseData = response.getBytes();
-            if (clientSocket == null) {
-                DatagramPacket responsePacket = new DatagramPacket(responseData, responseData.length, clientAddress, clientPort);
-                udpSocket.send(responsePacket);
-            } else {
-                clientSocket.getOutputStream().write(responseData);
-            }
+            clientConnection.sendResponse(response);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static int protocolVersionSupported(String[] parameters) {
-        if (parameters.length > 0) {
-            int clientProtocolVersion = Integer.parseInt(parameters[0]);
-            if (clientProtocolVersion <= PROTOCOL_VERSION) {
-                return Math.min(clientProtocolVersion, PROTOCOL_VERSION);
-            }
-        }
-        return -1;
-    }
-
-    private static String handleRequestType(String requestType, String[] parameters, int compatibleProtocolVersion, InetAddress clientAddress) {
+    private static void handleRequestType(String requestType, String[] parameters, ClientConnection clientConnection) {
         // Determine the message type and call the appropriate handler method
         if (requestType.equals("HELO")) {
-            return handleHELORequest(parameters, compatibleProtocolVersion, clientAddress);
+            String heloResponse = handleHELORequest(parameters, clientConnection);
+            sendResponse(clientConnection, heloResponse);
         } else if (requestType.equals("LIST")) {
-            return handleLISTRequest(parameters, compatibleProtocolVersion);
+            String listResponse = handleLISTRequest(parameters);
+            sendResponse(clientConnection, listResponse);
         } else if (requestType.equals("CREA")) {
-            return handleCREARequest(parameters, compatibleProtocolVersion, clientAddress);
+            String creaResponse = handleCREARequest(parameters, clientConnection);
+            sendResponse(clientConnection, creaResponse);
         } else if (requestType.equals("JOIN")) {
-            return handleJOINRequest(parameters, compatibleProtocolVersion, clientAddress);
+            String joinResponse = handleJOINRequest(parameters, clientConnection);
+            sendResponse(clientConnection, joinResponse);
+            if (!joinResponse.equals("JOND_ERR")) {
+                sendYRMV(parameters[0], clientConnection);
+            }
         } else {
-            return "ERR";
+            sendResponse(clientConnection, "METHOD NOT FOUND: " + requestType);
         }
     }
 
-    private static String handleHELORequest(String[] parameters, int compatibleProtocolVersion, InetAddress clientAddress) {
+    private static String handleHELORequest(String[] parameters, ClientConnection clientConnection) {
         if (parameters.length == 2) {
-            String sessionId = createID();
+            String version = parameters[0];
+            String sessionId = clientConnection.setSessionId();
             String clientId = parameters[1];
-            sessionIds.put(clientAddress, sessionId);
-            clientIds.put(sessionId, clientId);
-            return "SESS " + compatibleProtocolVersion + " " + sessionId;
+
+            int compatibleProtocolVersion = protocolVersionSupported(version);
+            if (compatibleProtocolVersion == -1) {
+                return "PROT_VER_ERR"; // adjust to correct error response
+            } else {
+                clientConnections.put(clientId, clientConnection);
+                return "SESS " + compatibleProtocolVersion + " " + sessionId;
+            }
         } else {
             return "SESS_ERR";
         }
     }
 
-    public static synchronized String createSessionID(){
-        return "SID" + String.valueOf(sessionIdCounter++);
-    }  
+    private static int protocolVersionSupported(String version) {
+        int clientProtocolVersion = Integer.parseInt(version);
+        if (clientProtocolVersion <= PROTOCOL_VERSION) {
+            return Math.min(clientProtocolVersion, PROTOCOL_VERSION);
+        }
+        return -1;
+    }
 
-    private static String handleLISTRequest(String[] parameters, int compatibleProtocolVersion) {
+    private static String handleLISTRequest(String[] parameters) {
         if (parameters.length == 0) {
-            // return list of games with less than 2 players
-            return "GAMS" + stringConcatenateGamesByType("OPEN");
-        } else if (parameters.length == 1) {
-            if (parameters[0].equals("CURR")){
-                return "GAMS" + stringConcatenateGamesByType("OPEN") + stringConcatenateGamesByType("FULL");
-            } else if (parameters[0].equals("ALL")){
-                return "GAMS" + stringConcatenateGamesByType("OPEN") + stringConcatenateGamesByType("FULL") + stringConcatenateGamesByType("DONE");
-            }
+            return "GAMS" + games.getGamesByType("OPEN");
+        } else if (parameters.length == 1 && (parameters[0].equals("CURR") || parameters[0].equals("ALL"))) {
+            return "GAMS" + games.getGamesByType(parameters[0]);
         }
         return "GAMS_ERR";
     }
 
-    private static String stringConcatenateGamesByType(String gameType){
-        String games = "";
-        for (String gameId : gameStates.keySet()) {
-            if (gameStates.get(gameId).equals(gameType)) {
-                games += " " + gameId;
+    private static String handleCREARequest(String[] parameters, ClientConnection clientConnection) {
+        if (parameters.length == 1) {
+            String clientId = parameters[0];
+            Game newGame = games.createGame(clientId);
+            return "JOND " + clientId + " " + newGame.getGameId();
+        } else {
+            return "JOND_ERR";
+        }
+    }
+
+    private static synchronized String handleJOINRequest(String[] parameters, ClientConnection clientConnection) {
+        if (parameters.length == 1) {
+            String clientId = clientConnection.getClientId();
+            String gameId = parameters[0];
+            if (games.addPlayerToGame(clientId, gameId)) {
+                return "JOND " + clientId + " " + gameId;
             }
         }
-        return games;
+        return "JOND_ERR";
     }
 
-    private static String handleCREARequest(String[] parameters, int compatibleProtocolVersion, InetAddress clientAddress) {
-        if (parameters.length == 1) {
-            String clientId = parameters[0]
-            String gameId = createGameID();
-            gameStates.put(gameId, "OPEN");
-            clientGames.computeIfAbsent(clientId, x -> new ArrayList<>()).add(gameId);
-            return "JOND " + clientId + " " + gameId;
-        } else {
-            return "JOND_ERR";
+    private static void sendYRMV(String gameId, ClientConnection clientConnection) {
+        Game game = games.getGame(gameId);
+        for (String clientId : game.getPlayers()) {
+            ClientConnection playerConnection = clientConnections.get(clientId);
+            sendResponse(playerConnection, "YRMV " + gameId + " " + game.getCurrentPlayer());
         }
+        game.switchTurn();
     }
 
-    public static synchronized String createGameID(){
-        return "GID" + String.valueOf(gameIdCounter++);
-    }  
-
-    private static String handleJOINRequest(String[] parameters, int compatibleProtocolVersion, InetAddress clientAddress) {
-        if (parameters.length == 1) {
-            // join game
-            String clientId = clientIds.get(sessionIds.get(clientAddress));
-            String gameId = parameters[0];
-            gameStates.put(gameId, "FULL");
-            clientGames.computeIfAbsent(clientId, x -> new ArrayList<>()).add(gameId);
-            // randomize first player
-            // send jond message
-            // if full also send yrmv message
-            
-        } else {
-            return "JOND_ERR";
-        }
-    }
 }
