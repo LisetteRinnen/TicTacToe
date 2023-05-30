@@ -216,7 +216,7 @@ class T3BoardState:
 ### Main
 print("Welcome to Tic Tac Toe Land.")
 print("What server do you want to connect to?")
-url = input("(default t3tcp://localhost:31161): ") or "t3tcp://localhost:31161"
+url = input("(default t3tcp://localhost:3116): ") or "t3tcp://localhost:3116"
 print("What is your e-mail?")
 client_id = input("(default alice@example.com): ") or "alice@example.com"
 print("Do you want verbose outputs? yes/no")
