@@ -94,6 +94,14 @@ class T3ProtocolClient:
 
         self.game_id = joined_game_id
 
+        my_turn = False
+        message, *args = self.sock.recv()
+        if message == "YRMV":
+            game_id, moving_player_id = args
+            my_turn = moving_player_id == self.client_id
+        
+        return my_turn
+
     def list_games(self):
         """ List available TTT games """
         self.sock.send(f"LIST")
@@ -109,6 +117,14 @@ class T3ProtocolClient:
         if joined_client_id != self.client_id: raise Exception("Received JOND response for wrong client ID")
 
         self.game_id = joined_game_id
+
+        my_turn = False
+        message, *args = self.sock.recv()
+        if message == "YRMV":
+            game_id, moving_player_id = args
+            my_turn = moving_player_id == self.client_id
+        
+        return my_turn
 
     def stat_game(self, game_id):
         """ Get the state of the TTT game with the given ID """
@@ -239,7 +255,7 @@ try:
         print("Would you like to create or join a game? create/join")
         action = input("(default create): ") or "create"
         if action == "create":
-            client.create_game()
+            my_turn = client.create_game()
             print("Game created:")
         else:
             user_decided_on_game = False
@@ -254,15 +270,16 @@ try:
 
                 print("Join this game? yes/no")
                 user_decided_on_game = (input("(default yes): ") or "yes") == "yes"
-            client.join_game(game_id)
+            my_turn = client.join_game(game_id)
             print("Game joined:")
 
         game_over = False
         resigned = False
         while not game_over:
             print(client.stat_current_game())
-            print("Waiting for turn...")
-            game_over, winner = client.wait_for_turn()
+            if not my_turn:
+                print("Waiting for turn...")
+                game_over, winner = client.wait_for_turn()
             if game_over:
                 break
 
