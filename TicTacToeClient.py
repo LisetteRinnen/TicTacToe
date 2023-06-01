@@ -177,6 +177,8 @@ class T3ProtocolClient:
     def make_move(self, desired_space):
         if self.game_id == None: raise Exception("make_move() called when no current game is active")
         success = True
+        game_over = False
+        winner = None
         initial_state = self.stat_current_game()
 
         self.sock.send(f"MOVE {self.game_id} {desired_space}")
@@ -185,15 +187,21 @@ class T3ProtocolClient:
             args = self.sock.recv()
             if args[0].upper() == "BORD":
                 bord, game_id, player1, player2, next_player, board_state = args
-            else:
+            elif args[0].upper() == "YRMV":
                 yrmv, game_id, moving_player_id = args
                 my_turn = moving_player_id == self.client_id
+            else:
+                game_over = True
+                self.game_id = None
+                game_id, winner_id, *_ = args
+                if winner_id != "KTHXBYE":
+                    winner = winner_id
 
         final_state = T3BoardState(game_id, player1, player2, next_player, board_state)
         if initial_state == final_state:
             success = False
 
-        return success
+        return success, game_over, winner
     
     def quit(self):
         """ Quit the TTT game without ending the session """
@@ -308,7 +316,7 @@ try:
                         resigned = True
                         break
                     else:
-                        move_made_successfully = client.make_move(desired_space)
+                        move_made_successfully, game_over, winner = client.make_move(desired_space)
                         if not move_made_successfully:
                             print("Illegal move!")
                         else:
