@@ -211,7 +211,7 @@ public class TicTacToeServer {
 
         int index = Integer.parseInt(parameters[1]);
         if (index > 9) {
-          return "MOVE_OUTOFBOUNDS";
+          return buildBORDResponse(gameId);
         } else {
           boolean goodMove = game.makeMove(index);
 
@@ -229,7 +229,7 @@ public class TicTacToeServer {
         int x = Integer.parseInt(parameters[1]);
         int y = Integer.parseInt(parameters[2]);
         if (x > 3 || y > 3) {
-          return "MOVE_OUTOFBOUNDS";
+          return buildBORDResponse(gameId);
         } else {
           boolean goodMove = game.makeMove(x, y);
 
