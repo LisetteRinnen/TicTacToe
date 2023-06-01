@@ -192,6 +192,7 @@ class T3ProtocolClient:
                     bord, game_id, player1, player2, next_player, board_state = response_args
                 else:
                     bord, game_id, player1, player2, next_player, board_state, winner = response_args
+                    game_over = True
             elif response_args[0].upper() == "YRMV":
                 yrmv, game_id, moving_player_id = response_args
                 my_turn = moving_player_id == self.client_id
