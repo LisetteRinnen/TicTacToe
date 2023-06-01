@@ -101,13 +101,22 @@ class Game {
     }
 
     public boolean makeMove(int x, int y) {
+      int[][] indicies = {
+        {1, 2, 3},
+        {4, 5, 6},
+        {7, 8, 9}
+      };
+
+      int[] row = indicies[3 - y];
+      int index = row[x - 1];
+
       String element = "X";
       String firstPlayerId = players.get(firstPlayer);
       if (!currentPlayer.equals(firstPlayerId)) {
         element = "O";
       }
 
-      int fixedIndex = 8 - (x + y);
+      int fixedIndex = index - 1;
       if (!board.get(fixedIndex).equals("*")) {
         return false;
       }
