@@ -140,7 +140,7 @@ class T3ProtocolClient:
         player2, next_player, board_state = None, None, None
         if len(bord_args) == 3:
             bord, game_id, player1 = bord_args
-        if len(bord_args) == 6:
+        elif len(bord_args) == 6:
             bord, game_id, player1, player2, next_player, board_state = bord_args
         else:
             bord, game_id, player1, player2, next_player, board_state, winner = bord_args
