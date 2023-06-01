@@ -109,6 +109,29 @@ public class TicTacToeServer {
             if (!joinResponse.equals("JOND_ERR")) {
                 sendYRMV(parameters[0], clientConnection);
             }
+        } else if (requestType.equals("STAT")) {
+            String statResponse = handleSTATRequest(parameters, clientConnection);
+            sendResponse(clientConnection, statResponse);
+        } else if (requestType.equals("MOVE")) {
+            String moveResponse = handleMOVERequest(parameters, clientConnection);
+            sendResponse(clientConnection, moveResponse);
+
+            boolean gameIsDone = checkIfDone(parameters[0]);
+
+            if (!moveResponse.equals("MOVE_ERR") || !moveResponse.equals("MOVE_OUTOFBOUNDS") || !gameIsDone) {
+                sendYRMV(parameters[0], clientConnection);
+            } else if (gameIsDone) {
+                buildTERMResponse(parameters[0], clientConnection);
+            }
+        } else if (requestType.equals("GDBY")) {
+            String gdbyResponse = handleGDBYRequest(parameters, clientConnection);
+            sendResponse(clientConnection, gdbyResponse);
+            clientConnection.close();
+        } else if (requestType.equals("QUIT")) {
+            boolean quitSuccess = handleQUITRequest(parameters, clientConnection);
+            if (!quitSuccess) {
+              sendResponse(clientConnection, "QUIT_ERR");
+            }
         } else {
             sendResponse(clientConnection, "METHOD NOT FOUND: " + requestType);
         }
@@ -119,6 +142,7 @@ public class TicTacToeServer {
             String version = parameters[0];
             String sessionId = clientConnection.setSessionId();
             String clientId = parameters[1];
+            clientConnection.setClientId(clientId);
 
             int compatibleProtocolVersion = protocolVersionSupported(version);
             if (compatibleProtocolVersion == -1) {
@@ -153,6 +177,7 @@ public class TicTacToeServer {
         if (parameters.length == 1) {
             String clientId = parameters[0];
             Game newGame = games.createGame(clientId);
+            clientConnection.addToGameList(newGame);
             return "JOND " + clientId + " " + newGame.getGameId();
         } else {
             return "JOND_ERR";
@@ -170,13 +195,144 @@ public class TicTacToeServer {
         return "JOND_ERR";
     }
 
+    private static String handleSTATRequest(String[] parameters, ClientConnection clientConnection) {
+      if (parameters.length == 1) {
+        String gameId = parameters[0];
+
+        return buildBORDResponse(gameId);
+      }
+      return "STAT_ERR";
+    }
+
+    private static String handleMOVERequest(String[] parameters, ClientConnection clientConnection) {
+      if (parameters.length == 2) {
+        String gameId = parameters[0];
+        Game game = games.getGame(gameId);
+
+        int index = Integer.parseInt(parameters[1]);
+        if (index > 9) {
+          return "MOVE_OUTOFBOUNDS";
+        } else {
+          boolean goodMove = game.makeMove(index);
+
+          if (goodMove) {
+            game.switchTurn();
+          }
+
+          return buildBORDResponse(gameId);
+        }
+
+      } else if (parameters.length == 3) {
+        String gameId = parameters[0];
+        Game game = games.getGame(gameId);
+
+        int x = Integer.parseInt(parameters[1]);
+        int y = Integer.parseInt(parameters[2]);
+        if (x > 3 || y > 3) {
+          return "MOVE_OUTOFBOUNDS";
+        } else {
+          boolean goodMove = game.makeMove(x, y);
+
+          if (goodMove) {
+            game.switchTurn();
+          }
+
+          game.switchTurn();
+
+          return buildBORDResponse(gameId);
+        }
+      }
+
+      return "MOVE_ERR";
+    }
+
+    private static String buildBORDResponse(String gameId) {
+      StringBuilder bordResponse = new StringBuilder();
+      Game game = games.getGame(gameId);
+      List<String> players = game.getPlayers();
+
+      bordResponse.append("BORD " + gameId + " ");
+
+      if (game.isOpen()) {
+        bordResponse.append(players.get(0));
+        return bordResponse.toString();
+      }
+
+      int firstPlayer = game.getFirstPlayer();
+
+      bordResponse.append(players.get(firstPlayer) + " ");
+      bordResponse.append(players.get(1 - firstPlayer) + " ");
+      bordResponse.append(game.getCurrentPlayer() + " " );
+
+      List<String> boardList = game.getBoard();
+      String board = buildT3Board(boardList);
+      bordResponse.append(board + " ");
+
+      if (game.isDone()) {
+        bordResponse.append(game.getWinner());
+      }
+      return bordResponse.toString();
+    }
+
+    private static String buildT3Board(List<String> board) {
+      StringBuilder t3board = new StringBuilder();
+      t3board.append("|");
+      for (int i = 0; i < board.size(); i ++) {
+        t3board.append(board.get(i));
+        t3board.append("|");
+      }
+      return t3board.toString();
+    }
+
     private static void sendYRMV(String gameId, ClientConnection clientConnection) {
         Game game = games.getGame(gameId);
         for (String clientId : game.getPlayers()) {
             ClientConnection playerConnection = clientConnections.get(clientId);
             sendResponse(playerConnection, "YRMV " + gameId + " " + game.getCurrentPlayer());
         }
-        game.switchTurn();
+    }
+
+    private static boolean checkIfDone(String gameId) {
+      Game game = games.getGame(gameId);
+      return game.isDone();
+    }
+
+    private static void buildTERMResponse(String gameId, ClientConnection clientConnection) {
+      Game game = games.getGame(gameId);
+      for (String clientId : game.getPlayers()) {
+        ClientConnection playerConnection = clientConnections.get(clientId);
+        sendResponse(playerConnection, "TERM " + gameId + " " + game.getWinner() + " KTHXBYE");
+      }
+    }
+
+    private static String handleGDBYRequest(String[] parameters, ClientConnection clientConnection) {
+      if (parameters.length == 1) {
+        String clientId = clientConnection.getClientId();
+        ArrayList<Game> gameList = clientConnection.getGameList();
+        for (Game game : gameList) {
+          if (!game.isDone()) {
+            game.finishGame();
+            game.setWinner(clientId);
+            buildTERMResponse(clientId, clientConnection);
+          }
+        }
+        return "GDBY";
+      }
+      return "GDBY_ERR";
+    }
+
+    private static boolean handleQUITRequest(String[] parameters, ClientConnection clientConnection) {
+      if (parameters.length == 1) {
+        String gameId = parameters[0];
+        String clientId = clientConnection.getClientId();
+        Game game = games.getGame(gameId);
+        game.finishGame();
+        game.setWinner(clientId);
+
+        buildTERMResponse(gameId, clientConnection);
+        return true;
+      }
+      return false;
     }
 
 }
