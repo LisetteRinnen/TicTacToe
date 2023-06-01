@@ -91,8 +91,8 @@ class Game {
         element = "O";
       }
 
-      int fixedIndex = 9 - index + 1;
-      if (!board.get(fixedIndex).equals("*")) {
+      int fixedIndex = 8 - index + 1;
+      if (board.get(fixedIndex).equals("*")) {
         return false;
       }
       board.set(fixedIndex, element);

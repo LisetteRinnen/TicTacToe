@@ -85,9 +85,10 @@ public class ClientConnection {
     }
 
     public void sendResponse(String response) throws IOException {
-        byte[] responseData = response.getBytes();
+        byte[] responseData = (response + "\r\n").getBytes();
         if (isTcpConnection()) {
             outputStream.write(responseData);
+            outputStream.flush();
         } else if (isUdpConnection()) {
             DatagramPacket responsePacket = new DatagramPacket(responseData, responseData.length, clientAddress, clientPort);
             udpSocket.send(responsePacket);
