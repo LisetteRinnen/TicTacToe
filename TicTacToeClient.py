@@ -298,6 +298,8 @@ try:
                         move_made_successfully = client.make_move(desired_space)
                         if not move_made_successfully:
                             print("Illegal move!")
+                        else:
+                            my_turn = False
         if not resigned:
             print(f"{winner} won the game!")
         else:
