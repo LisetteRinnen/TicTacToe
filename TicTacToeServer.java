@@ -209,49 +209,44 @@ public class TicTacToeServer {
         String gameId = parameters[0];
         Game game = games.getGame(gameId);
 
-        try {
-          int index = Integer.parseInt(parameters[1]);
-          if (index > 9) {
-            return buildBORDResponse(gameId);
-          } else {
-            boolean goodMove = game.makeMove(index);
-
-            if (goodMove) {
-              game.switchTurn();
+        if (parameters[1].contains(",")) {
+          String[] coord = parameters[1].split(",");
+          try {
+            int x = Integer.parseInt(coord[0]);
+            int y = Integer.parseInt(coord[1]);
+            if (x > 3 || y > 3) {
+              System.out.println("index out of bounds: " + x + " " + y);
+              return buildBORDResponse(gameId);
             }
 
-            return buildBORDResponse(gameId);
-          }
-        } catch (Exception e) {
-          return buildBORDResponse(gameId);
-        }
-
-
-      } else if (parameters.length == 3) {
-        String gameId = parameters[0];
-        Game game = games.getGame(gameId);
-
-        try {
-          int x = Integer.parseInt(parameters[1]);
-          int y = Integer.parseInt(parameters[2]);
-          if (x > 3 || y > 3) {
-            return buildBORDResponse(gameId);
-          } else {
             boolean goodMove = game.makeMove(x, y);
-
             if (goodMove) {
               game.switchTurn();
             }
+            return buildBORDResponse(gameId);
 
-            game.switchTurn();
-
+          } catch (Exception e){
             return buildBORDResponse(gameId);
           }
-        } catch (Exception e) {
-          return buildBORDResponse(gameId);
+        } else {
+          try {
+            int index = Integer.parseInt(parameters[1]);
+            if (index > 9) {
+              System.out.println("index out of bounds: " + index);
+              return buildBORDResponse(gameId);
+            }
+
+            boolean goodMove = game.makeMove(index);
+            if (goodMove) {
+              game.switchTurn();
+            }
+            return buildBORDResponse(gameId);
+
+          } catch (Exception e) {
+            return buildBORDResponse(gameId);
+          }
         }
       }
-
       return "MOVE_ERR";
     }
 
