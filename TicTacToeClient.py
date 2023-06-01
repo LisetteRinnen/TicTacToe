@@ -166,6 +166,11 @@ class T3ProtocolClient:
 
         return success
     
+    def quit(self):
+        """ Quit the TTT game without ending the session """
+        self.sock.send(f"QUIT")
+        self.game_id = None
+    
     def end_session(self):
         """ End the TTT session """
         self.sock.send(f"GDBY {self.session_id}")
@@ -253,6 +258,7 @@ try:
             print("Game joined:")
 
         game_over = False
+        resigned = False
         while not game_over:
             print(client.stat_current_game())
             print("Waiting for turn...")
@@ -264,12 +270,21 @@ try:
             if not game_over:
                 move_made_successfully = False
                 while not move_made_successfully:
-                    print("Where do you want to go? (1-9, starting from top left)")
+                    print("Where do you want to go? (1-9 starting from top left or 'quit' to resign)")
                     desired_space = input("(default 1): ") or "1"
-                    move_made_successfully = client.make_move(desired_space)
-                    if not move_made_successfully:
-                        print("Illegal move!")
-        print(f"{winner} won the game!")
+                    if desired_space == "quit":
+                        client.quit()
+                        game_over = True
+                        resigned = True
+                        break
+                    else:
+                        move_made_successfully = client.make_move(desired_space)
+                        if not move_made_successfully:
+                            print("Illegal move!")
+        if not resigned:
+            print(f"{winner} won the game!")
+        else:
+            print(f"You resigned from the game!")
 except KeyboardInterrupt:
     client.end_session()
     print("Goodbye!")
