@@ -92,7 +92,7 @@ class Game {
       }
 
       int fixedIndex = 9 - index + 1;
-      if (board.get(fixedIndex).equals("*")) {
+      if (!board.get(fixedIndex).equals("*")) {
         return false;
       }
       board.set(fixedIndex, element);
