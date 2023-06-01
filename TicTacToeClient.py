@@ -140,8 +140,10 @@ class T3ProtocolClient:
         player2, next_player, board_state = None, None, None
         if len(bord_args) == 3:
             bord, game_id, player1 = bord_args
-        else:
+        if len(bord_args) == 6:
             bord, game_id, player1, player2, next_player, board_state = bord_args
+        else:
+            bord, game_id, player1, player2, next_player, board_state, winner = bord_args
 
         board = T3BoardState(game_id, player1, player2, next_player, board_state)
         return board
@@ -184,16 +186,19 @@ class T3ProtocolClient:
         self.sock.send(f"MOVE {self.game_id} {desired_space}")
 
         for _ in range(2):
-            args = self.sock.recv()
-            if args[0].upper() == "BORD":
-                bord, game_id, player1, player2, next_player, board_state = args
-            elif args[0].upper() == "YRMV":
-                yrmv, game_id, moving_player_id = args
+            response_args = self.sock.recv()
+            if response_args[0].upper() == "BORD":
+                if len(response_args) == 6:
+                    bord, game_id, player1, player2, next_player, board_state = response_args
+                else:
+                    bord, game_id, player1, player2, next_player, board_state, winner = response_args
+            elif response_args[0].upper() == "YRMV":
+                yrmv, game_id, moving_player_id = response_args
                 my_turn = moving_player_id == self.client_id
             else:
                 game_over = True
                 self.game_id = None
-                game_id, winner_id, *_ = args
+                term, game_id, winner_id, *_ = response_args
                 if winner_id != "KTHXBYE":
                     winner = winner_id
 
