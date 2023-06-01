@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.*;
 
 public class ClientConnection {
     private Socket tcpSocket;
@@ -10,6 +11,7 @@ public class ClientConnection {
     private int clientPort;
     private String sessionId;
     private String clientId;
+    private ArrayList<Game> gameList;
 
     private static long sessionIdCounter = 0;
 
@@ -21,6 +23,7 @@ public class ClientConnection {
         this.clientPort = socket.getPort();
         this.sessionId = null;
         this.clientId = null;
+        this.gameList = new ArrayList<>();
     }
 
     public ClientConnection(DatagramSocket socket, InetAddress address, int port) {
@@ -64,9 +67,18 @@ public class ClientConnection {
         this.clientId = clientId;
     }
 
+    public void addToGameList(Game game) {
+      this.gameList.add(game);
+    }
+
+    public ArrayList<Game> getGameList() {
+      return gameList;
+    }
+
+
     public static synchronized String createSessionID(){
         return "SID" + sessionIdCounter++;
-    }  
+    }
 
     public String readRequest() throws IOException {
         return reader.readLine();
