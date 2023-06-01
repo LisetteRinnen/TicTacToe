@@ -118,7 +118,7 @@ public class TicTacToeServer {
 
             boolean gameIsDone = checkIfDone(parameters[0]);
 
-            if (!moveResponse.equals("MOVE_ERR") || !gameIsDone) {
+            if (!moveResponse.equals("MOVE_ERR") && !gameIsDone) {
                 sendYRMV(parameters[0], clientConnection);
             } else if (gameIsDone) {
                 buildTERMResponse(parameters[0], clientConnection);
