@@ -107,7 +107,7 @@ class Game {
         element = "O";
       }
 
-      int fixedIndex = 9 - (x + y);
+      int fixedIndex = 8 - (x + y);
       if (!board.get(fixedIndex).equals("*")) {
         return false;
       }
