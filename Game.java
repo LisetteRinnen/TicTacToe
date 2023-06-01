@@ -91,8 +91,8 @@ class Game {
         element = "O";
       }
 
-      int fixedIndex = 8 - index + 1;
-      if (board.get(fixedIndex).equals("*")) {
+      int fixedIndex = index - 1;
+      if (!board.get(fixedIndex).equals("*")) {
         return false;
       }
       board.set(fixedIndex, element);
@@ -101,7 +101,19 @@ class Game {
     }
 
     public boolean makeMove(int x, int y) {
-      return makeMove(x + y);
+      String element = "X";
+      String firstPlayerId = players.get(firstPlayer);
+      if (!currentPlayer.equals(firstPlayerId)) {
+        element = "O";
+      }
+
+      int fixedIndex = 9 - (x + y);
+      if (!board.get(fixedIndex).equals("*")) {
+        return false;
+      }
+      board.set(fixedIndex, element);
+      checkForWinner();
+      return true;
     }
 
     public List<String> getBoard() {
