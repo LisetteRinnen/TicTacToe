@@ -8,6 +8,8 @@ class T3TransportLayerSocket:
     """
     MAX_BUF_SIZE = 2048
 
+    msg_queue = []
+
     def __init__(self, hostname, port, protocol, verbose=False):
         self.protocol = protocol
         self.server_addr = (hostname, port)
@@ -42,15 +44,19 @@ class T3TransportLayerSocket:
     def recv(self):
         """ Recieve a response body from the TTT server as a List of arguments
             e.g. "MOVE GID1 5" -> ["MOVE", "GID1", "5"]
-        """       
-        if self.protocol == "TCP":
-            response_body = self.sock.recv(self.MAX_BUF_SIZE)
-        elif self.protocol == "UDP":
-            response_body = self.sock.recvfrom(self.MAX_BUF_SIZE, self.server_addr)
+        """ 
+        if len(self.msg_queue) == 0:
+            if self.protocol == "TCP":
+                response_body = self.sock.recv(self.MAX_BUF_SIZE)
+            elif self.protocol == "UDP":
+                response_body = self.sock.recvfrom(self.MAX_BUF_SIZE, self.server_addr)
         
-        response_body = self.t3decode(response_body)
-        if verbose: print(f"[{self.protocol} RECV] {response_body}")
-        return response_body.split(" ")
+            response_body = self.t3decode(response_body)
+            if verbose: print(f"[{self.protocol} RECV] {response_body}")
+
+            self.msg_queue += [msg for msg in response_body.split("\r\n") if len(msg) > 0]
+
+        return [arg for arg in self.msg_queue.pop(0).split(" ") if len(arg) > 0]
     
     def close(self):
         """ Close the socket if necessary """
@@ -175,7 +181,14 @@ class T3ProtocolClient:
 
         self.sock.send(f"MOVE {self.game_id} {desired_space}")
 
-        bord, game_id, player1, player2, next_player, board_state = self.sock.recv()
+        for _ in range(2):
+            args = self.sock.recv()
+            if args[0].upper() == "BORD":
+                bord, game_id, player1, player2, next_player, board_state = args
+            else:
+                yrmv, game_id, moving_player_id = args
+                my_turn = moving_player_id == self.client_id
+
         final_state = T3BoardState(game_id, player1, player2, next_player, board_state)
         if initial_state == final_state:
             success = False
@@ -255,8 +268,8 @@ try:
         print("Would you like to create or join a game? create/join")
         action = input("(default create): ") or "create"
         if action == "create":
+            print("Game created... waiting for players...")
             my_turn = client.create_game()
-            print("Game created:")
         else:
             user_decided_on_game = False
             while not user_decided_on_game:
@@ -298,6 +311,8 @@ try:
                         move_made_successfully = client.make_move(desired_space)
                         if not move_made_successfully:
                             print("Illegal move!")
+                        else:
+                            my_turn = False
         if not resigned:
             print(f"{winner} won the game!")
         else:
