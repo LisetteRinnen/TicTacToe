@@ -49,7 +49,7 @@ class T3TransportLayerSocket:
             if self.protocol == "TCP":
                 response_body = self.sock.recv(self.MAX_BUF_SIZE)
             elif self.protocol == "UDP":
-                response_body = self.sock.recvfrom(self.MAX_BUF_SIZE, self.server_addr)
+                response_body, _ = self.sock.recvfrom(self.MAX_BUF_SIZE)
         
             response_body = self.t3decode(response_body)
             if verbose: print(f"[{self.protocol} RECV] {response_body}")
