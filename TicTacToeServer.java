@@ -39,14 +39,26 @@ public class TicTacToeServer {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 udpSocket.receive(packet);
 
-                System.out.println("UDP CLIENT CONNECTED");
-
-                String request = new String(packet.getData(), 0, packet.getLength());
+                ClientConnection clientConnection = null;
                 InetAddress clientAddress = packet.getAddress();
                 int clientPort = packet.getPort();
+                for (ClientConnection c : clientConnections.values()) {
+                    if (c.getClientAddress().equals(clientAddress) && c.getClientPort() == clientPort) {
+                        clientConnection = c;
+                        break;
+                    }
+                }
+                if (clientConnection == null) { 
+                    System.out.println("UDP CLIENT CONNECTED");
+                    clientConnection = new ClientConnection(udpSocket, clientAddress, clientPort);
+                }
+                final ClientConnection finalClientConnection = clientConnection;
+                String request = new String(packet.getData(), 0, packet.getLength());
                 System.out.println("[UDP REQUEST] " + request);
 
-                exec.execute(() -> handleClientRequest(new ClientConnection(udpSocket, clientAddress, clientPort), request));
+                exec.execute(() -> {
+                    handleClientRequest(finalClientConnection, request);
+                });
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -102,6 +114,7 @@ public class TicTacToeServer {
             sendResponse(clientConnection, listResponse);
         } else if (requestType.equals("CREA")) {
             String creaResponse = handleCREARequest(parameters, clientConnection);
+            System.out.println("CreateResponse:  " + creaResponse);
             sendResponse(clientConnection, creaResponse);
         } else if (requestType.equals("JOIN")) {
             String joinResponse = handleJOINRequest(parameters, clientConnection);
