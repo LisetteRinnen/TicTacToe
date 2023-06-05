@@ -7,3 +7,6 @@ The server is written in Java and the client is written in Python because Freder
 The client was tested and working on Python 3.9.11.
 1. Run `python3 TicTacToeClient.py`
 2. Follow the instructions on screen
+
+## Interoperability
+Video: https://drive.google.com/drive/u/0/folders/1eDHYFI2cD7r5x0TdUUr056xQF1dzYIiA
