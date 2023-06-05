@@ -35,12 +35,12 @@ class T3TransportLayerSocket:
     def send(self, request_body):
         """ Send the request body in plaintext (no newline characters) to the TTT server """
         if verbose: print(f"[{self.protocol} SEND] {request_body}")
-        request_body = self.t3encode(request_body)
 
         if self.protocol == "TCP":
+            request_body = self.t3encode(request_body)
             self.sock.send(request_body)
         elif self.protocol == "UDP":
-            self.sock.sendto(request_body, self.server_addr)
+            self.sock.sendto(request_body.encode("ascii"), self.server_addr)
     
     def recv(self):
         """ Recieve a response body from the TTT server as a List of arguments

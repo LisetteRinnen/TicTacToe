@@ -32,6 +32,7 @@ public class ClientConnection {
         this.clientPort = port;
         this.sessionId = null;
         this.clientId = null;
+        this.gameList = new ArrayList<>();
     }
 
     public boolean isTcpConnection() {
@@ -52,6 +53,14 @@ public class ClientConnection {
 
     public String getSessionId() {
         return sessionId;
+    }
+
+    public InetAddress getClientAddress() {
+        return this.clientAddress;
+    }
+
+    public int getClientPort() {
+        return this.clientPort;
     }
 
     public String getClientId() {
@@ -89,9 +98,11 @@ public class ClientConnection {
         if (isTcpConnection()) {
             outputStream.write(responseData);
             outputStream.flush();
+            System.out.println("[TCP response] " + response);
         } else if (isUdpConnection()) {
             DatagramPacket responsePacket = new DatagramPacket(responseData, responseData.length, clientAddress, clientPort);
             udpSocket.send(responsePacket);
+            System.out.println("[UDP response] " + response);
         }
     }
 
