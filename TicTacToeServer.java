@@ -191,6 +191,7 @@ public class TicTacToeServer {
             String clientId = parameters[0];
             Game newGame = games.createGame(clientId);
             clientConnection.addToGameList(newGame);
+            System.out.println("hello" + clientId + "bye");
             return "JOND " + clientId + " " + newGame.getGameId();
         } else {
             return "JOND_ERR";
