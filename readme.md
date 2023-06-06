@@ -9,4 +9,9 @@ The client was tested and working on Python 3.9.11.
 2. Follow the instructions on screen
 
 ## Interoperability
-Video: https://drive.google.com/drive/u/0/folders/1eDHYFI2cD7r5x0TdUUr056xQF1dzYIiA
+Our client with TreblenaX client: https://github.com/treblenaX/INFO314-TicTacToeRFC/
+
+Our server with Mattramirez7 server: https://github.com/mattramirez7/TicTacToeRFC
+
+Both videos are in a Google Drive.
+Link: https://drive.google.com/drive/u/0/folders/1eDHYFI2cD7r5x0TdUUr056xQF1dzYIiA
