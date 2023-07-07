@@ -29,6 +29,7 @@ class T3TransportLayerSocket:
     
     def t3decode(self, response_body):
         """ Decode the response body for the TTT protocol """
+        print("[RAW RECV]", response_body.decode("ascii").strip())
         return response_body.decode("ascii").strip()
 
     def send(self, request_body):
@@ -211,7 +212,7 @@ class T3ProtocolClient:
     
     def quit(self):
         """ Quit the TTT game without ending the session """
-        self.sock.send(f"QUIT")
+        self.sock.send(f"QUIT {self.game_id}")
         self.game_id = None
     
     def end_session(self):
